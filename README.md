@@ -20,7 +20,7 @@ Unlike standard maps which just list businesses, ZoneScout uses a **Multi-Agent 
 
 ## ⚙️ How It Works (System Flow)
 
-![ZoneScout Architecture](Flow%20Diagram.png)
+![ZoneScout Architecture](Flow.png)
 
 
 # 🚀 How to Run
@@ -52,6 +52,7 @@ Create a file named `.env` in the root folder and add your API keys:
 
 **Sravanakumar Sathish**
 🔗 [LinkedIn](https://www.linkedin.com/in/sravanakumar-sathish/)
+
 
 
 
