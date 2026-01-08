@@ -3,6 +3,7 @@ import os
 import json
 import requests
 import asyncio
+import pandas as pd
 from google import genai
 from groq import Groq
 from dotenv import load_dotenv, find_dotenv
@@ -36,7 +37,7 @@ except Exception as e:
     st.error(f"❌ API Setup Error: {e}")
     st.stop()
 
-# --- 2. BACKEND LOGIC (Cached for Speed) ---
+# --- 2. BACKEND LOGIC ---
 
 @st.cache_data(show_spinner=False)
 def get_bbox_from_pincode(pincode):
@@ -45,10 +46,8 @@ def get_bbox_from_pincode(pincode):
     params = {"address": pincode, "key": GOOGLE_API_KEY}
     
     try:
-        # Initial Request
         resp = requests.get(url, params=params).json()
         
-        # Retry with Country if zero results (Fixes the "90210" issue)
         if resp['status'] == 'ZERO_RESULTS':
             params['address'] = f"{pincode}, USA"
             resp = requests.get(url, params=params).json()
@@ -92,7 +91,7 @@ def search_places_strict(query, bbox):
     headers = {
         "Content-Type": "application/json",
         "X-Goog-Api-Key": GOOGLE_API_KEY,
-        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.editorialSummary,places.types,places.websiteUri,places.rating"
+        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.editorialSummary,places.types,places.websiteUri,places.rating,places.nationalPhoneNumber,places.googleMapsUri"
     }
     payload = {
         "textQuery": query,
@@ -103,7 +102,14 @@ def search_places_strict(query, bbox):
             }
         }
     }
+    
     resp = requests.post(url, headers=headers, json=payload)
+    
+    if resp.status_code != 200:
+        st.error(f"❌ Google API Error: {resp.status_code}")
+        st.json(resp.json()) 
+        return []
+    
     return resp.json().get('places', [])
 
 async def verify_single_lead(place, criteria):
@@ -149,6 +155,26 @@ async def verify_all_leads_async(leads, criteria):
     tasks = [verify_single_lead(lead, criteria) for lead in leads]
     return await asyncio.gather(*tasks)
 
+# --- NEW: HELPER FOR DYNAMIC SOCIAL LINKS ---
+def get_social_link(name, types):
+    """Decides if the business needs Instagram or LinkedIn."""
+    # List of B2C categories that perform better on Instagram
+    insta_categories = [
+        'cafe', 'restaurant', 'bakery', 'bar', 'night_club', 
+        'clothing_store', 'beauty_salon', 'spa', 'gym', 
+        'florist', 'meal_delivery', 'meal_takeaway', 'store', 
+        'shopping_mall', 'tourist_attraction'
+    ]
+    
+    # Check if any business type matches our Insta list
+    is_insta = any(t in insta_categories for t in types)
+    
+    if is_insta:
+        return "Instagram", f"https://www.instagram.com/explore/tags/{name.replace(' ', '').lower()}/"
+    else:
+        # Default to LinkedIn for B2B / Professional / Other
+        return "LinkedIn", f"https://www.linkedin.com/search/results/all/?keywords={name.replace(' ', '%20')}"
+
 # --- 3. STREAMLIT UI ---
 
 # Sidebar
@@ -183,18 +209,15 @@ with st.sidebar:
 
     st.markdown("---")
     st.subheader("2. Search Parameters")
-    query = st.text_input("Find Businesses:", "e.g., Independent Coffee Shops")
+    query = st.text_input("Find Businesses:", "Coffee Shop") 
     criteria = st.text_area("Strict AI Criteria:", "Must be a small business. NO big chains like Starbucks.")
 
 # Main Screen
 st.header("Hyper-Local Business Intelligence")
 st.markdown("Generate verified leads from specific map zones using Multimodal AI.")
 
-# Check if Zone is set
 if 'bbox' in st.session_state:
     bbox = st.session_state['bbox']
-    
-    # Create a simple Map UI to show the active zone (Using rough center point)
     center_lat = (bbox['north'] + bbox['south']) / 2
     center_lon = (bbox['east'] + bbox['west']) / 2
     st.map({"lat": [center_lat], "lon": [center_lon]}, zoom=13)
@@ -203,7 +226,6 @@ if 'bbox' in st.session_state:
         if not query:
             st.warning("Please enter a search term.")
         else:
-            # Step 1: Search
             with st.status("🕵️ Scouting Google Maps Database...", expanded=True) as status:
                 raw_leads = search_places_strict(query, bbox)
                 if not raw_leads:
@@ -211,26 +233,42 @@ if 'bbox' in st.session_state:
                     st.stop()
                 
                 status.write(f"Found {len(raw_leads)} raw candidates. Deploying AI Agents...")
-                
-                # Step 2: Verify (Async)
                 verified_leads = asyncio.run(verify_all_leads_async(raw_leads, criteria))
-                
                 status.update(label="Audit Complete!", state="complete")
             
-            # Display Results
             approved = [l for l in verified_leads if l.get('ai_status') == 'APPROVED']
             rejected = [l for l in verified_leads if l.get('ai_status') == 'REJECTED']
             
             col1, col2 = st.columns(2)
             col1.metric("Qualified Leads", len(approved))
             col2.metric("Rejected (Noise)", len(rejected))
-            
+
+            # --- DISPLAY RESULTS ---
             st.subheader("✅ Verified Leads")
             for lead in approved:
-                with st.expander(f"{lead['displayName']['text']} (⭐ {lead.get('rating', 'N/A')})"):
-                    st.write(f"**Address:** {lead.get('formattedAddress')}")
-                    st.write(f"**Website:** {lead.get('websiteUri', 'N/A')}")
-                    st.success(f"**AI Reason:** {lead['ai_reason']}")
+                name = lead['displayName']['text']
+                phone = lead.get('nationalPhoneNumber', 'Not listed')
+                website = lead.get('websiteUri', '#')
+                maps_link = lead.get('googleMapsUri', '#')
+                types = lead.get('types', [])
+                
+                # Dynamic Social Link
+                social_platform, social_url = get_social_link(name, types)
+                social_icon = "📸" if social_platform == "Instagram" else "👔"
+
+                with st.expander(f"{name} (⭐ {lead.get('rating', 'N/A')})"):
+                    c1, c2 = st.columns([2, 1])
+                    with c1:
+                        st.markdown(f"**📍 Address:** {lead.get('formattedAddress')}")
+                        st.markdown(f"**📞 Phone:** `{phone}`")
+                        st.markdown(f"**🤖 AI Analysis:** {lead['ai_reason']}")
+                    with c2:
+                        st.markdown("### Quick Links")
+                        if website != '#':
+                            st.markdown(f"[🌐 Visit Website]({website})")
+                        if maps_link != '#':
+                            st.markdown(f"[🗺️ Open in Maps]({maps_link})")
+                        st.markdown(f"[{social_icon} Search {social_platform}]({social_url})")
             
             if rejected:
                 with st.expander("Show Rejected Leads (Hidden by default)"):
