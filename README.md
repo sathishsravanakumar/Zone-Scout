@@ -4,7 +4,7 @@
 
 **ZoneScout is an AI-powered business intelligence tool that finds, filters, and verifies local leads.**
 
-Unlike standard maps which just list businesses, ZoneScout uses a **Multi-Agent AI** approach. It scans a specific geographic zone (via Zip Code or Map Screenshot), extracts business data, and then uses a **Reasoning Agent (Llama 3.3)** to audit every single lead against your strict criteria. It automatically generates social media links (LinkedIn for tech, Instagram for retail) and provides verified contact details.
+Unlike standard maps which just list businesses, ZoneScout uses a **Multi-Agent AI** approach. It scans a specific geographic zone (via Zip Code or Map Screenshot), extracts business data, and then uses a **Reasoning Agent (Llama 3.3)** to audit every single lead against your strict criteria. It automatically generates social media links (LinkedIn for tech, Instagram for retail) and provides verified contact details along with reviews.
 
 ---
 
@@ -52,6 +52,7 @@ Create a file named `.env` in the root folder and add your API keys:
 
 **Sravanakumar Sathish**
 🔗 [LinkedIn](https://www.linkedin.com/in/sravanakumar-sathish/)
+
 
 
 
