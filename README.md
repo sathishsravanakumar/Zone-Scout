@@ -1,5 +1,3 @@
-﻿# Zone-Scout
-
 # ZoneScout 📍
 
 **ZoneScout is an AI-powered business intelligence tool that finds, filters, and verifies local leads.**
@@ -7,6 +5,7 @@
 Unlike standard maps which just list businesses, ZoneScout uses a **Multi-Agent AI** approach. It scans a specific geographic zone (via Zip Code or Map Screenshot), extracts business data, and then uses a **Reasoning Agent (Llama 3.3)** to audit every single lead against your strict criteria. It automatically generates social media links (LinkedIn for tech, Instagram for retail) and provides verified contact details along with reviews.
 
 ---
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/9e826bb0-80ce-4ec6-bfaf-ff5a0e3aea4f" />
 
 ## 🛠️ Tech Stack
 
